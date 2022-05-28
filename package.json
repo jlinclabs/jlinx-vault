@@ -1,0 +1,40 @@
+{
+  "name": "jlinx-vault",
+  "version": "1.0.0",
+  "description": "store anything in an encrypted directory using a key value store interface",
+  "main": "index.js",
+  "scripts": {
+    "lint": "standard",
+    "test": "standard && tape test/*.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/jlinclabs/jlinx-vault.git"
+  },
+  "keywords": [
+    "jlinx",
+    "crypto",
+    "keys",
+    "store",
+    "persistence",
+    "secure"
+  ],
+  "author": "Jared Grippe",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jlinclabs/jlinx-vault/issues"
+  },
+  "homepage": "https://github.com/jlinclabs/jlinx-vault#readme",
+  "dependencies": {
+    "b4a": "^1.5.3",
+    "compact-encoding": "^2.5.1",
+    "safety-catch": "^1.0.2",
+    "sodium-universal": "^3.0.4"
+  },
+  "devDependencies": {
+    "jlinx-util": "file:../util",
+    "standard": "^17.0.0",
+    "tape": "^5.5.3",
+    "tmp-promise": "^3.0.3"
+  }
+}
