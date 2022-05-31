@@ -94,15 +94,13 @@ module.exports = class JlinxVault {
     key = b4a.from(key)
     const encryptedKey = this.crypto.encrypt(key, key)
     const asHex = encryptedKey.toString('hex')
-    debug('encryptedKey', asHex)
-    const decryptedKey = this.crypto.decrypt(b4a.from(asHex, 'hex'), key)
-    debug('decryptedKey', decryptedKey.toString(), b4a.equals(decryptedKey, key))
-    return Path.join(
+    const path = Path.join(
       this.path,
       asHex.slice(0, 2),
       asHex.slice(2, 4),
       asHex
     )
+    return path
   }
 
   async set (key, value, encoding = 'string') {
@@ -111,19 +109,17 @@ module.exports = class JlinxVault {
       throw new Error(`invalid encoding "${encoding}"`)
     }
     const path = await this._keyToPath(key)
-    const encoded = encoder.encode(b4a.from(value))
+    debug('set', { key, path })
+    const encoded = encoder.encode(value)
     const decrypted = b4a.concat([encoder.prefix, encoded])
     const encrypted = this.crypto.encrypt(decrypted, key)
-    debug('set', { key, path })
     await new Promise((resolve, reject) => {
       const dirPath = Path.dirname(path)
-      debug('mkdir', dirPath)
       mkdirp(dirPath, error => {
         if (error) { reject(error) } else { resolve() }
       })
     })
     await fs.writeFile(path, encrypted)
-    debug('set success', key)
     return true
   }
 
@@ -147,7 +143,6 @@ module.exports = class JlinxVault {
     if (!encoder) {
       throw new Error(`unkown encoding prefix="${prefix}"`)
     }
-    debug('get using encoder', encoder)
     const value = encoder.decode(encoded)
     return value
   }
@@ -157,9 +152,8 @@ module.exports = class JlinxVault {
   }
 
   async delete (key) {
-    debug('delete', { key })
     const path = await this._keyToPath(key)
-    debug('delete', { path })
+    debug('delete', { key, path })
     try {
       await fs.unlink(path)
       return true
@@ -168,10 +162,50 @@ module.exports = class JlinxVault {
       throw error
     }
   }
+
+  namespace (prefix, defaultEncoding) {
+    return new JlinxVaultNamespace(this, prefix, defaultEncoding)
+  }
+}
+
+class JlinxVaultNamespace {
+  constructor (vault, prefix, defaultEncoding) {
+    this.vault = vault
+    this.prefix = b4a.from(prefix)
+    this.defaultEncoding = defaultEncoding
+  }
+
+  [Symbol.for('nodejs.util.inspect.custom')] (depth, opts) {
+    let indent = ''
+    if (typeof opts.indentationLvl === 'number') { while (indent.length < opts.indentationLvl) indent += ' ' }
+    return this.constructor.name + '(\n' +
+      indent + '  prefix: ' + opts.stylize(this.prefix, 'string') + '\n' +
+      indent + '  defaultEncoding: ' + opts.stylize(this.defaultEncoding, 'string') + '\n' +
+      indent + ')'
+  }
+
+  _prefix (key) {
+    return b4a.concat([this.prefix, b4a.from(key)])
+  }
+
+  async get (key) {
+    return await this.vault.get(this._prefix(key))
+  }
+
+  async set (key, value, encoding = this.defaultEncoding) {
+    return await this.vault.set(this._prefix(key), value, encoding)
+  }
+
+  async has (key) {
+    return await this.vault.has(this._prefix(key))
+  }
+
+  async delete (key) {
+    return await this.vault.delete(this._prefix(key))
+  }
 }
 
 function makeCrypto (key) {
-
   return {
     encrypt (decrypted, name) {
       const nonce = deriveNonce(key, name)
