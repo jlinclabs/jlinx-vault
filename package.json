@@ -28,6 +28,7 @@
   "dependencies": {
     "b4a": "^1.5.3",
     "compact-encoding": "^2.5.1",
+    "mkdirp-classic": "^0.5.3",
     "safety-catch": "^1.0.2",
     "sodium-universal": "^3.0.4"
   },
