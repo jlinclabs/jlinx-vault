@@ -59,12 +59,14 @@ module.exports = class JlinxVault {
   async _open () {
     const keyCheck = await this.get('KEY_CHECK')
     if (keyCheck) {
-      if (!b4a.equals(KEY_CHECK_VALUE, keyCheck)) {
+      if (KEY_CHECK_VALUE !== keyCheck) {
         throw new Error('invalid vault key')
       }
     } else {
       await this.init()
     }
+    // TODO lock a file so only one process can
+    // have the vault open at a time
   }
 
   async exists () {
@@ -169,6 +171,7 @@ module.exports = class JlinxVault {
 }
 
 function makeCrypto (key) {
+
   return {
     encrypt (decrypted, name) {
       const nonce = deriveNonce(key, name)
