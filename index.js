@@ -166,7 +166,19 @@ module.exports = class JlinxVault {
   namespace (prefix, defaultEncoding) {
     return new JlinxVaultNamespace(this, prefix, defaultEncoding)
   }
+
+  // getSet(key){
+  //   return new JlinxVaultSet(this, key)
+  // }
 }
+
+// class JlinxVaultSet {
+//   constructor (vault, key) {
+
+//   }
+//   _getValue
+
+// }
 
 class JlinxVaultNamespace {
   constructor (vault, prefix, defaultEncoding) {
@@ -206,6 +218,15 @@ class JlinxVaultNamespace {
 }
 
 function makeCrypto (key) {
+  if (
+    !b4a.isBuffer(key) ||
+    key.byteLength !== sodium.crypto_secretstream_xchacha20poly1305_KEYBYTES
+  ) {
+    throw new Error(
+      'vault key must be a Buffer of length ' +
+      sodium.crypto_secretstream_xchacha20poly1305_KEYBYTES
+    )
+  }
   return {
     encrypt (decrypted, name) {
       const nonce = deriveNonce(key, name)

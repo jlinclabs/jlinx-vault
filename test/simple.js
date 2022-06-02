@@ -1,6 +1,7 @@
 const b4a = require('b4a')
 const { randomBytes, createSigningKeyPair } = require('jlinx-util')
 const { test } = require('./helpers')
+const Vault = require('../')
 
 test('simple', async (t, create) => {
   const vault = await create()
@@ -81,4 +82,17 @@ test('namespaces', async (t, create) => {
   const docs = vault.namespace('docs', 'json')
   await docs.set('1', { id: 1 })
   t.deepEqual(await docs.get('1'), { id: 1 })
+})
+
+test('bad key', async (t) => {
+  let vault
+  t.throws(() => {
+    vault = new Vault()
+  })
+  t.throws(() => {
+    vault = new Vault({
+      key: ''
+    })
+  })
+  t.same(vault, undefined)
 })
