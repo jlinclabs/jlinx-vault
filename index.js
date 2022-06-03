@@ -6,6 +6,7 @@ const b4a = require('b4a')
 const fs = require('fs/promises')
 const mkdirp = require('mkdirp-classic')
 const cenc = require('compact-encoding')
+const KeyStore = require('./key-store')
 
 const debug = Debug('jlinx:vault')
 
@@ -43,6 +44,10 @@ module.exports = class JlinxVault {
   constructor (opts) {
     this.path = opts.path
     this.crypto = opts.crypto || makeCrypto(opts.key)
+
+    this.keys = new KeyStore(this, 'keys')
+    this.ownerSigningKeys = this.namespace('ownerSigningKeys', 'raw')
+
     this._opening = this._open()
   }
 
@@ -69,6 +74,10 @@ module.exports = class JlinxVault {
     // have the vault open at a time
   }
 
+  async close(){
+    // TODO release lock
+  }
+
   async exists () {
     try {
       await fs.stat(this.path)
@@ -90,7 +99,6 @@ module.exports = class JlinxVault {
   }
 
   async _keyToPath (key) {
-    debug('_keyToPath', { key })
     key = b4a.from(key)
     const encryptedKey = this.crypto.encrypt(key, key)
     const asHex = encryptedKey.toString('hex')
