@@ -7,6 +7,7 @@ const fs = require('fs/promises')
 const mkdirp = require('mkdirp-classic')
 const cenc = require('compact-encoding')
 const KeyStore = require('./key-store')
+const JlinxVaultSet = require('./set')
 
 const debug = Debug('jlinx:vault')
 
@@ -94,6 +95,7 @@ module.exports = class JlinxVault {
 
   async init () {
     await mkdirp(this.path)
+    // TODO ensure were dont overrite
     await this.set('VERION', VERSION)
     await this.set('KEY_CHECK', KEY_CHECK_VALUE)
   }
@@ -175,18 +177,10 @@ module.exports = class JlinxVault {
     return new JlinxVaultNamespace(this, prefix, defaultEncoding)
   }
 
-  // getSet(key){
-  //   return new JlinxVaultSet(this, key)
-  // }
+  getSet (key) {
+    return new JlinxVaultSet(this, key)
+  }
 }
-
-// class JlinxVaultSet {
-//   constructor (vault, key) {
-
-//   }
-//   _getValue
-
-// }
 
 class JlinxVaultNamespace {
   constructor (vault, prefix, defaultEncoding) {
