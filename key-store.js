@@ -17,43 +17,17 @@ module.exports = class KeyStore {
 
   async createSigningKeyPair(){
     const { publicKey, secretKey } = createSigningKeyPair()
-    console.log('CREATING SINING KEY PAIR', {
-      publicKey, secretKey
-    })
     await this._keys.set(publicKey, secretKey)
-    // return this.get(publicKey)
-    const kp = await this.get(publicKey)
-    await validateKeyPair(kp)
-    return kp
+    return await this.get(publicKey)
   }
 
   async get(publicKey){
-    console.trace('Vault KeyStore.get', publicKey)
     const getSecretKey = () => this._keys.get(publicKey)
-    if (!(await getSecretKey())) {
-      console.log('KEY NOT FOUND', publicKey)
-      return
-    }
-
-
-    // TMP
-    const secretKey = await getSecretKey()
-    console.log('GETTING SINING KEY PAIR', {
-      publicKey, secretKey
-    })
-    if (!validateSigningKeyPair({ publicKey, secretKey })){
-      throw new Error('created invalid key pair')
-    }
-
-
+    if (!(await getSecretKey())) return
     return {
       type: 'signing',
       publicKey,
       async sign(message){
-        console.trace('SIGNING!', {
-          publicKey,
-          secretKey: await getSecretKey(),
-        })
         return sign(message, await getSecretKey())
       },
       async verify(message, signature){
@@ -61,16 +35,4 @@ module.exports = class KeyStore {
       }
     }
   }
-}
-
-
-async function validateKeyPair(keyPair){
-  console.log('VALIDATING KP', {keyPair})
-  const message = Buffer.from('hello world')
-  const signature = await keyPair.sign(message)
-  const valid = await keyPair.verify(message, signature)
-  if (!valid){
-    throw new Error(`invalid key pair`)
-  }
-  return true
 }
