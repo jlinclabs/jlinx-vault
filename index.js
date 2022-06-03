@@ -7,7 +7,8 @@ const fs = require('fs/promises')
 const mkdirp = require('mkdirp-classic')
 const cenc = require('compact-encoding')
 const KeyStore = require('./key-store')
-const JlinxVaultSet = require('./set')
+const RecordStore = require('./record-store')
+// const JlinxVaultSet = require('./set')
 
 const debug = Debug('jlinx:vault')
 
@@ -47,7 +48,7 @@ module.exports = class JlinxVault {
     this.crypto = opts.crypto || makeCrypto(opts.key)
 
     this.keys = new KeyStore(this, 'keys')
-    this.ownerSigningKeys = this.namespace('ownerSigningKeys', 'raw')
+    this.docs = new RecordStore(this, 'docs')
 
     this._opening = this._open()
   }
@@ -177,9 +178,9 @@ module.exports = class JlinxVault {
     return new JlinxVaultNamespace(this, prefix, defaultEncoding)
   }
 
-  getSet (key) {
-    return new JlinxVaultSet(this, key)
-  }
+  // getSet (key) {
+  //   return new JlinxVaultSet(this, key)
+  // }
 }
 
 class JlinxVaultNamespace {
@@ -197,6 +198,8 @@ class JlinxVaultNamespace {
       indent + '  defaultEncoding: ' + opts.stylize(this.defaultEncoding, 'string') + '\n' +
       indent + ')'
   }
+
+  ready () { return this.vault.ready() }
 
   _prefix (key) {
     return b4a.concat([this.prefix, b4a.from(key)])

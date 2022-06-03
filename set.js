@@ -1,3 +1,4 @@
+// TODO impliment file locks / locking
 module.exports = class JlinxVaultSet {
   constructor (vault, key) {
     this.toArray = async () => (await vault.get(key)) || []

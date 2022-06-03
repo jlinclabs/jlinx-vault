@@ -10,19 +10,17 @@ const {
 module.exports = class KeyStore {
 
   constructor (vault, key) {
-    this._keys = vault.namespace(key, 'raw')
+    this._store = vault.namespace(key, 'raw')
   }
-
-  ready () { return this._vault.ready() }
 
   async createSigningKeyPair(){
     const { publicKey, secretKey } = createSigningKeyPair()
-    await this._keys.set(publicKey, secretKey)
+    await this._store.set(publicKey, secretKey)
     return await this.get(publicKey)
   }
 
   async get(publicKey){
-    const getSecretKey = () => this._keys.get(publicKey)
+    const getSecretKey = () => this._store.get(publicKey)
     if (!(await getSecretKey())) return
     return {
       type: 'signing',
