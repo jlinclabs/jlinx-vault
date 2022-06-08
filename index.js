@@ -47,8 +47,9 @@ module.exports = class JlinxVault {
     this.path = opts.path
     this.crypto = opts.crypto || makeCrypto(opts.key)
 
-    this.keys = new KeyStore(this, 'keys')
-    this.docs = new RecordStore(this, 'docs')
+    this.keys = this.keyStore('keys')
+    this.docs = this.recordStore('docs')
+    // this.appAccounts = this.recordStore('appAccounts')
 
     this._opening = this._open()
   }
@@ -178,6 +179,14 @@ module.exports = class JlinxVault {
     return new JlinxVaultNamespace(this, prefix, defaultEncoding)
   }
 
+  keyStore(key){
+    return new KeyStore(this, key)
+  }
+
+  recordStore(key){
+    return new RecordStore(this, key)
+  }
+
   // getSet (key) {
   //   return new JlinxVaultSet(this, key)
   // }
@@ -202,6 +211,8 @@ class JlinxVaultNamespace {
   ready () { return this.vault.ready() }
 
   _prefix (key) {
+    debug('_prefix', { key })
+    if (typeof key === 'number') key = `${key}`
     return b4a.concat([this.prefix, b4a.from(key)])
   }
 

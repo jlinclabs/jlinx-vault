@@ -7,6 +7,10 @@ module.exports = class RecordStore {
     this._ids = new VaultSet(this._records, '_ids')
   }
 
+  async size(){
+    return await this._ids.size()
+  }
+
   async put(id, value){
     await this._records.set(id, value)
     await this._ids.add(id)
@@ -27,6 +31,13 @@ module.exports = class RecordStore {
 
   async ids(){
     return await this._ids.toArray()
+  }
+
+  async all(){
+    const ids = await this.ids()
+    return await Promise.all(
+      ids.map(id => this.get(id))
+    )
   }
 
 }
