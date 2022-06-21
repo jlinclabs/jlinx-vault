@@ -1,8 +1,10 @@
+const EventEmitter = require('events')
 const VaultSet = require('./set')
 
-module.exports = class RecordStore {
+module.exports = class RecordStore extends EventEmitter {
 
   constructor (vault, key) {
+    super()
     this._records = vault.namespace(key, 'json')
     this._ids = new VaultSet(this._records, '_ids')
   }
@@ -14,6 +16,7 @@ module.exports = class RecordStore {
   async put(id, value){
     await this._records.set(id, value)
     await this._ids.add(id)
+    this.emit('put', id)
   }
 
   async get(id){
@@ -23,6 +26,7 @@ module.exports = class RecordStore {
   async delete(id){
     await this._records.delete(id)
     await this._ids.delete(id)
+    this.emit('delete', id)
   }
 
   async has(id){
