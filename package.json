@@ -33,7 +33,7 @@
     "sodium-universal": "^3.0.4"
   },
   "devDependencies": {
-    "jlinx-util": "file:../util",
+    "jlinx-util": "github:jlinclabs/jlinx-util#b9cd3cd0a71352ec4605652d7944111124a589e6",
     "standard": "^17.0.0",
     "tape": "^5.5.3",
     "tmp-promise": "^3.0.3"
