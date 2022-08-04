@@ -77,7 +77,7 @@ module.exports = class JlinxVault {
     // have the vault open at a time
   }
 
-  async close(){
+  async close () {
     // TODO release lock
   }
 
@@ -103,6 +103,7 @@ module.exports = class JlinxVault {
   }
 
   async _keyToPath (key) {
+    debug('_keyToPath', { key })
     key = b4a.from(key)
     const encryptedKey = this.crypto.encrypt(key, key)
     const asHex = encryptedKey.toString('hex')
@@ -179,11 +180,11 @@ module.exports = class JlinxVault {
     return new JlinxVaultNamespace(this, prefix, defaultEncoding)
   }
 
-  keyStore(key){
+  keyStore (key) {
     return new KeyStore(this, key)
   }
 
-  recordStore(key){
+  recordStore (key) {
     return new RecordStore(this, key)
   }
 

@@ -5,11 +5,11 @@ module.exports = class JlinxVaultSet {
     this._update = set => vault.set(key, [...set], 'json')
   }
 
-  async size(){
+  async size () {
     return (await this.toArray()).length
   }
 
-  async toSet(){
+  async toSet () {
     return new Set(await this.toArray())
   }
 
@@ -20,7 +20,7 @@ module.exports = class JlinxVaultSet {
   }
 
   async clear () {
-    await this._update(new Set)
+    await this._update(new Set())
   }
 
   async delete (member) {
@@ -43,5 +43,4 @@ module.exports = class JlinxVaultSet {
     const set = await this.toSet()
     return set.values()
   }
-
 }
