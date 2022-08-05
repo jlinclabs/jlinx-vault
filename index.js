@@ -98,7 +98,7 @@ module.exports = class JlinxVault {
   async init () {
     await mkdirp(this.path)
     // TODO ensure were dont overrite
-    await this.set('VERION', VERSION)
+    await this.set('VERSION', VERSION)
     await this.set('KEY_CHECK', KEY_CHECK_VALUE)
   }
 
