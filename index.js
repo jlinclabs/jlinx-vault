@@ -1,14 +1,13 @@
 const Debug = require('debug')
 const Path = require('path')
-// const safetyCatch = require('safety-catch')
 const sodium = require('sodium-universal')
 const b4a = require('b4a')
 const fs = require('fs/promises')
 const mkdirp = require('mkdirp-classic')
+const readDirRecursive = require('recursive-readdir')
 const cenc = require('compact-encoding')
 const KeyStore = require('./key-store')
 const RecordStore = require('./record-store')
-// const JlinxVaultSet = require('./set')
 
 const debug = Debug('jlinx:vault')
 
@@ -46,11 +45,6 @@ module.exports = class JlinxVault {
   constructor (opts) {
     this.path = opts.path
     this.crypto = opts.crypto || makeCrypto(opts.key)
-
-    this.keys = this.keyStore('keys')
-    this.docs = this.recordStore('docs')
-    // this.appAccounts = this.recordStore('appAccounts')
-
     this._opening = this._open()
   }
 
@@ -73,8 +67,8 @@ module.exports = class JlinxVault {
     } else {
       await this.init()
     }
-    // TODO lock a file so only one process can
-    // have the vault open at a time
+    // TODO use file locks to do transactions
+    // TODO lock a file so only one process can have the vault open at a time
   }
 
   async close () {
@@ -105,7 +99,7 @@ module.exports = class JlinxVault {
   async _keyToPath (key) {
     debug('_keyToPath', { key })
     key = b4a.from(key)
-    const encryptedKey = this.crypto.encrypt(key, key)
+    const encryptedKey = this.crypto.encrypt(key)
     const asHex = encryptedKey.toString('hex')
     const path = Path.join(
       this.path,
@@ -116,16 +110,17 @@ module.exports = class JlinxVault {
     return path
   }
 
-  async set (key, value, encoding = 'string') {
+  async set (key, value, encoding = 'json') {
     const encoder = ENCODERS.find(encoder => encoder.name === encoding)
     if (!encoder) {
       throw new Error(`invalid encoding "${encoding}"`)
     }
     const path = await this._keyToPath(key)
     debug('set', { key, path })
+    if (typeof value === 'undefined') return await this.delete(key)
     const encoded = encoder.encode(value)
     const decrypted = b4a.concat([encoder.prefix, encoded])
-    const encrypted = this.crypto.encrypt(decrypted, key)
+    const encrypted = this.crypto.encrypt(decrypted)
     await new Promise((resolve, reject) => {
       const dirPath = Path.dirname(path)
       mkdirp(dirPath, error => {
@@ -147,7 +142,7 @@ module.exports = class JlinxVault {
       throw error
     }
     if (!encrypted) return
-    const decrypted = this.crypto.decrypt(encrypted, key)
+    const decrypted = this.crypto.decrypt(encrypted)
     const prefix = decrypted.slice(0, 1)
     const encoded = decrypted.slice(1)
     const encoder = ENCODERS.find(encoder =>
@@ -176,21 +171,72 @@ module.exports = class JlinxVault {
     }
   }
 
+  async keys (prefix) {
+    console.log(`vault.keys(prefix = ${prefix})`)
+    const files = await readDirRecursive(this.path)
+    const all = files .map(path => {
+      const key = path.split('/').reverse()[0]
+      return this.crypto.decrypt(Buffer.from(key, 'hex')).toString()
+    })
+    if (!prefix) return all
+    prefix = b4a.concat([b4a.from(prefix), PREFIX_DELIMITER])
+    const subset = []
+    for (const key of all){
+      if (!bufferStartsWith(key, prefix)) continue
+      subset.push(b4a.from(key).subarray(prefix.length).toString())
+    }
+    return subset
+  }
+
   namespace (prefix, defaultEncoding) {
     return new JlinxVaultNamespace(this, prefix, defaultEncoding)
   }
 
-  keyStore (key) {
-    return new KeyStore(this, key)
+  records (prefix, defaultEncoding = 'json') {
+    return new JlinxVaultRecords(this.namespace(prefix, defaultEncoding))
   }
+}
 
-  recordStore (key) {
-    return new RecordStore(this, key)
+function bufferStartsWith(left, right){
+  return b4a.from(left).lastIndexOf(b4a.from(right)) === 0
+}
+
+const PREFIX_DELIMITER = b4a.from('.')
+function joinPrefix(left, right){
+  if (typeof right === 'undefined') return b4a.from(left)
+  return b4a.concat([b4a.from(left), PREFIX_DELIMITER, b4a.from(right)])
+}
+
+function makeCrypto (key) {
+  const nonce = deriveNonce(key, 'one nonce to rule them')
+  if (
+    !b4a.isBuffer(key) ||
+    key.byteLength !== sodium.crypto_secretstream_xchacha20poly1305_KEYBYTES
+  ) {
+    throw new Error(
+      'vault key must be a Buffer of length ' +
+      sodium.crypto_secretstream_xchacha20poly1305_KEYBYTES
+    )
   }
+  return {
+    encrypt (decrypted) {
+      const encrypted = Buffer.alloc(decrypted.length + sodium.crypto_secretbox_MACBYTES)
+      sodium.crypto_secretbox_easy(encrypted, decrypted, nonce, key)
+      return encrypted
+    },
+    decrypt (encrypted) {
+      const decrypted = b4a.alloc(encrypted.length - sodium.crypto_secretbox_MACBYTES)
+      sodium.crypto_secretbox_open_easy(decrypted, encrypted, nonce, key)
+      return decrypted
+    }
+  }
+}
 
-  // getSet (key) {
-  //   return new JlinxVaultSet(this, key)
-  // }
+function deriveNonce (key, name) {
+  if (!b4a.isBuffer(name)) name = b4a.from(name)
+  const out = b4a.alloc(sodium.crypto_secretbox_NONCEBYTES)
+  sodium.crypto_generichash_batch(out, [b4a.from('jlinx rules'), name], key)
+  return out
 }
 
 class JlinxVaultNamespace {
@@ -214,55 +260,95 @@ class JlinxVaultNamespace {
   _prefix (key) {
     debug('_prefix', { key })
     if (typeof key === 'number') key = `${key}`
-    return b4a.concat([this.prefix, b4a.from(key)])
+    return joinPrefix(this.prefix, key)
+    // return b4a.concat([this.prefix, b4a.from('.'), b4a.from(key)])
   }
 
-  async get (key) {
-    return await this.vault.get(this._prefix(key))
+  namespace (prefix, defaultEncoding = this.defaultEncoding) {
+    return new JlinxVaultNamespace(this, prefix, defaultEncoding)
   }
 
-  async set (key, value, encoding = this.defaultEncoding) {
-    return await this.vault.set(this._prefix(key), value, encoding)
+  records (prefix, defaultEncoding = 'json') {
+    return new JlinxVaultRecords(this.namespace(prefix, defaultEncoding))
   }
 
-  async has (key) {
-    return await this.vault.has(this._prefix(key))
+  get (key) { return this.vault.get(this._prefix(key)) }
+
+  set (key, value, encoding = this.defaultEncoding) {
+    return this.vault.set(this._prefix(key), value, encoding)
   }
 
-  async delete (key) {
-    return await this.vault.delete(this._prefix(key))
+  has (key) { return this.vault.has(this._prefix(key)) }
+
+  delete (key) { return this.vault.delete(this._prefix(key)) }
+
+  keys (prefix) {
+    return this.vault.keys(joinPrefix(this.prefix, prefix))
   }
 }
 
-function makeCrypto (key) {
-  if (
-    !b4a.isBuffer(key) ||
-    key.byteLength !== sodium.crypto_secretstream_xchacha20poly1305_KEYBYTES
-  ) {
-    throw new Error(
-      'vault key must be a Buffer of length ' +
-      sodium.crypto_secretstream_xchacha20poly1305_KEYBYTES
+class JlinxVaultRecords {
+  constructor(vault){
+    this.vault = vault
+    this.ids = new JlinxVaultSet(this.vault, 'ids')
+  }
+
+  _recordKey(id){ return `record:${id}` }
+
+  async get(id){
+    return await this.vault.get(this._recordKey(id))
+  }
+
+  async all(){
+    const ids = await this.ids.all()
+    if (ids.length === 0) return ids
+    return await Promise.all(
+      ids.map(id => this.get(id))
     )
   }
-  return {
-    encrypt (decrypted, name) {
-      const nonce = deriveNonce(key, name)
-      const encrypted = Buffer.alloc(decrypted.length + sodium.crypto_secretbox_MACBYTES)
-      sodium.crypto_secretbox_easy(encrypted, decrypted, nonce, key)
-      return encrypted
-    },
-    decrypt (encrypted, name) {
-      const nonce = deriveNonce(key, name)
-      const decrypted = b4a.alloc(encrypted.length - sodium.crypto_secretbox_MACBYTES)
-      sodium.crypto_secretbox_open_easy(decrypted, encrypted, nonce, key)
-      return decrypted
-    }
+
+  async allById(){
+    const all = await this.all()
+    const byId = {}
+    all.forEach(record => { byId[record.id] = record })
+    return byId
+  }
+
+  async set(id, value){
+    id = `${id}`
+    if (typeof value === 'undefined') return await this.delete(id)
+    await this.ids.add(id)
+    await this.vault.set(this._recordKey(id), value)
+  }
+
+  async delete(id){
+    id = `${id}`
+    await this.ids.delete(id)
+    await this.vault.delete(this._recordKey(id))
   }
 }
 
-function deriveNonce (key, name) {
-  if (!b4a.isBuffer(name)) name = b4a.from(name)
-  const out = b4a.alloc(sodium.crypto_secretbox_NONCEBYTES)
-  sodium.crypto_generichash_batch(out, [b4a.from('jlinx rules'), name], key)
-  return out
+class JlinxVaultSet {
+  constructor(vault, key){
+    this.vault = vault
+    this.key = key
+  }
+
+  async all(){
+    return await this.vault.get(this.key) || []
+  }
+
+  async add(id){
+    let ids = await this.all()
+    ids = new Set(ids)
+    ids.add(id)
+    await this.vault.set(this.key, [...ids], 'json')
+  }
+
+  async delete(id){
+    let ids = await this.all()
+    ids = new Set(ids)
+    ids.delete(id)
+    await this.vault.set(this.key, [...ids], 'json')
+  }
 }
