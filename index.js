@@ -172,7 +172,6 @@ module.exports = class JlinxVault {
   }
 
   async keys (prefix) {
-    console.log(`vault.keys(prefix = ${prefix})`)
     const files = await readDirRecursive(this.path)
     const all = files .map(path => {
       const key = path.split('/').reverse()[0]
