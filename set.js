@@ -8,22 +8,22 @@ module.exports = class JlinxVaultSet {
     return await this.vault.get(this.key) || []
   }
 
-  async add (id) {
-    let ids = await this.all()
-    ids = new Set(ids)
-    ids.add(id)
-    await this.vault.set(this.key, [...ids], 'json')
+  async add (value) {
+    let values = await this.all()
+    values = new Set(values)
+    values.add(value)
+    await this.vault.set(this.key, [...values], 'json')
   }
 
-  async delete (id) {
-    let ids = await this.all()
-    ids = new Set(ids)
-    ids.delete(id)
-    await this.vault.set(this.key, [...ids], 'json')
+  async delete (value) {
+    let values = await this.all()
+    values = new Set(values)
+    values.delete(value)
+    await this.vault.set(this.key, [...values], 'json')
   }
 
-  async has (id) {
-    return (await this.all()).includes(id)
+  async has (value) {
+    return (await this.all()).includes(value)
   }
 }
 

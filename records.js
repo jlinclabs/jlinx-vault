@@ -27,11 +27,11 @@ module.exports = class JlinxVaultRecords {
     return byId
   }
 
-  async set (id, value) {
+  async set (id, value, encoding) {
     id = `${id}`
     if (typeof value === 'undefined') return await this.delete(id)
     await this.ids.add(id)
-    await this.vault.set(this._recordKey(id), value)
+    await this.vault.set(this._recordKey(id), value, encoding)
   }
 
   async delete (id) {

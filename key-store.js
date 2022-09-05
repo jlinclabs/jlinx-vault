@@ -6,20 +6,17 @@ const {
   // createEncryptingKeyPair,
   // validateEncryptingKeyPair,
 } = require('jlinx-util')
+const JlinxVaultRecords = require('./records')
 
-module.exports = class KeyStore {
-  constructor (vault, key) {
-    this.vault = vault.records(key, 'raw')
-  }
-
+module.exports = class JlinxVaultKeyStore extends JlinxVaultRecords {
   async createSigningKeyPair () {
     const { publicKey, secretKey } = createSigningKeyPair()
-    await this.vault.set(publicKey, secretKey)
+    await this.set(publicKey, secretKey, 'raw')
     return await this.get(publicKey)
   }
 
   async get (publicKey) {
-    const getSecretKey = () => this.vault.get(publicKey)
+    const getSecretKey = () => super.get(publicKey)
     if (!(await getSecretKey())) return
     return {
       type: 'signing',

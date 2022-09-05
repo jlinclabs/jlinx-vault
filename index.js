@@ -48,7 +48,7 @@ module.exports = class JlinxVault extends Namespace.Base {
     this.crypto = opts.crypto || makeCrypto(opts.key)
     this._opening = this._open()
     this.defaultEncoding = opts.defaultEncoding
-    this.keystore = new KeyStore(this, 'keystore')
+    this.keystore = new KeyStore(this.namespace('keystore', 'raw'))
   }
 
   [Symbol.for('nodejs.util.inspect.custom')] (depth, opts) {
