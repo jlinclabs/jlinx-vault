@@ -6,8 +6,6 @@ const fs = require('fs/promises')
 const mkdirp = require('mkdirp-classic')
 const readDirRecursive = require('recursive-readdir')
 const cenc = require('compact-encoding')
-const KeyStore = require('./key-store')
-const RecordStore = require('./record-store')
 
 const debug = Debug('jlinx:vault')
 
@@ -35,7 +33,17 @@ const ENCODERS = [
   }
 ]
 
-module.exports = class JlinxVault {
+class JlinxBaseNamespace {
+  namespace (prefix, defaultEncoding = this.defaultEncoding) {
+    return new JlinxVaultNamespace(this, prefix, defaultEncoding)
+  }
+
+  records (prefix, defaultEncoding = 'json') {
+    return new JlinxVaultRecords(this.namespace(prefix, defaultEncoding))
+  }
+}
+
+module.exports = class JlinxVault extends JlinxBaseNamespace {
   static generateKey () {
     const buffer = b4a.allocUnsafe(sodium.crypto_secretstream_xchacha20poly1305_KEYBYTES)
     sodium.crypto_secretstream_xchacha20poly1305_keygen(buffer)
@@ -43,9 +51,11 @@ module.exports = class JlinxVault {
   }
 
   constructor (opts) {
+    super()
     this.path = opts.path
     this.crypto = opts.crypto || makeCrypto(opts.key)
     this._opening = this._open()
+    this.defaultEncoding = opts.defaultEncoding
   }
 
   [Symbol.for('nodejs.util.inspect.custom')] (depth, opts) {
@@ -173,35 +183,27 @@ module.exports = class JlinxVault {
 
   async keys (prefix) {
     const files = await readDirRecursive(this.path)
-    const all = files .map(path => {
+    const all = files.map(path => {
       const key = path.split('/').reverse()[0]
       return this.crypto.decrypt(Buffer.from(key, 'hex')).toString()
     })
     if (!prefix) return all
     prefix = b4a.concat([b4a.from(prefix), PREFIX_DELIMITER])
     const subset = []
-    for (const key of all){
+    for (const key of all) {
       if (!bufferStartsWith(key, prefix)) continue
       subset.push(b4a.from(key).subarray(prefix.length).toString())
     }
     return subset
   }
-
-  namespace (prefix, defaultEncoding) {
-    return new JlinxVaultNamespace(this, prefix, defaultEncoding)
-  }
-
-  records (prefix, defaultEncoding = 'json') {
-    return new JlinxVaultRecords(this.namespace(prefix, defaultEncoding))
-  }
 }
 
-function bufferStartsWith(left, right){
+function bufferStartsWith (left, right) {
   return b4a.from(left).lastIndexOf(b4a.from(right)) === 0
 }
 
 const PREFIX_DELIMITER = b4a.from('.')
-function joinPrefix(left, right){
+function joinPrefix (left, right) {
   if (typeof right === 'undefined') return b4a.from(left)
   return b4a.concat([b4a.from(left), PREFIX_DELIMITER, b4a.from(right)])
 }
@@ -238,8 +240,9 @@ function deriveNonce (key, name) {
   return out
 }
 
-class JlinxVaultNamespace {
+class JlinxVaultNamespace extends JlinxBaseNamespace {
   constructor (vault, prefix, defaultEncoding) {
+    super()
     this.vault = vault
     this.prefix = b4a.from(prefix)
     this.defaultEncoding = defaultEncoding
@@ -260,15 +263,6 @@ class JlinxVaultNamespace {
     debug('_prefix', { key })
     if (typeof key === 'number') key = `${key}`
     return joinPrefix(this.prefix, key)
-    // return b4a.concat([this.prefix, b4a.from('.'), b4a.from(key)])
-  }
-
-  namespace (prefix, defaultEncoding = this.defaultEncoding) {
-    return new JlinxVaultNamespace(this, prefix, defaultEncoding)
-  }
-
-  records (prefix, defaultEncoding = 'json') {
-    return new JlinxVaultRecords(this.namespace(prefix, defaultEncoding))
   }
 
   get (key) { return this.vault.get(this._prefix(key)) }
@@ -287,18 +281,18 @@ class JlinxVaultNamespace {
 }
 
 class JlinxVaultRecords {
-  constructor(vault){
+  constructor (vault) {
     this.vault = vault
     this.ids = new JlinxVaultSet(this.vault, 'ids')
   }
 
-  _recordKey(id){ return `record:${id}` }
+  _recordKey (id) { return `record:${id}` }
 
-  async get(id){
+  async get (id) {
     return await this.vault.get(this._recordKey(id))
   }
 
-  async all(){
+  async all () {
     const ids = await this.ids.all()
     if (ids.length === 0) return ids
     return await Promise.all(
@@ -306,48 +300,54 @@ class JlinxVaultRecords {
     )
   }
 
-  async allById(){
+  async allById () {
     const all = await this.all()
     const byId = {}
     all.forEach(record => { byId[record.id] = record })
     return byId
   }
 
-  async set(id, value){
+  async set (id, value) {
     id = `${id}`
     if (typeof value === 'undefined') return await this.delete(id)
     await this.ids.add(id)
     await this.vault.set(this._recordKey(id), value)
   }
 
-  async delete(id){
+  async delete (id) {
     id = `${id}`
     await this.ids.delete(id)
     await this.vault.delete(this._recordKey(id))
   }
+
+  size () { return this.ids.all().length }
 }
 
 class JlinxVaultSet {
-  constructor(vault, key){
+  constructor (vault, key) {
     this.vault = vault
     this.key = key
   }
 
-  async all(){
+  async all () {
     return await this.vault.get(this.key) || []
   }
 
-  async add(id){
+  async add (id) {
     let ids = await this.all()
     ids = new Set(ids)
     ids.add(id)
     await this.vault.set(this.key, [...ids], 'json')
   }
 
-  async delete(id){
+  async delete (id) {
     let ids = await this.all()
     ids = new Set(ids)
     ids.delete(id)
     await this.vault.set(this.key, [...ids], 'json')
+  }
+
+  async has (id) {
+    return (await this.all()).includes(id)
   }
 }

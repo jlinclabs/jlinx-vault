@@ -5,9 +5,8 @@ const Vault = require('../../')
 
 Object.assign(exports, {
   test,
-  createVault,
+  createVault
 })
-
 
 const newTmpDir = async (t) => {
   const { path } = await tmp.dir()
@@ -24,7 +23,6 @@ async function createVault (t) {
   await vault.ready()
   return vault
 }
-
 
 // module.exports.test = function (name, fn, _tape = tape) {
 //   return _tape(name, run)
