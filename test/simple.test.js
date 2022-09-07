@@ -108,7 +108,7 @@ test('namespaces', async (t) => {
 
   t.alike(
     (await vault.keys()).sort(),
-    ['docs.2', 'VERSION', 'names.cat1', 'KEY_CHECK', 'names.cat2'].sort()
+    ['docs.2', 'names.cat1', 'names.cat2'].sort()
   )
 
   for (const key of await vault.keys()) {
@@ -173,7 +173,7 @@ test('records', async (t) => {
 
   t.alike(
     (await vault.keys()).sort(),
-    ['posts.record:1', 'VERSION', 'posts.ids', 'KEY_CHECK'].sort()
+    ['posts.record:1', 'posts.ids'].sort()
   )
   t.alike(
     (await posts.vault.keys()).sort(),

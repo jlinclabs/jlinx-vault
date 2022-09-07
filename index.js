@@ -17,6 +17,11 @@ const debug = Debug('jlinx:vault')
 const VERSION = '1'
 const KEY_CHECK_VALUE = 'KEY_CHECKS_OUT'
 
+const INTERNAL_KEYS = new Set([
+  'VERSION',
+  'KEY_CHECK'
+])
+
 const ENCODERS = [
   {
     name: 'raw',
@@ -173,10 +178,15 @@ module.exports = class JlinxVault extends Namespace.Base {
   }
 
   async keys (prefix) {
+    // TODO strip private/internal keys
     const files = await readDirRecursive(this.path)
-    const all = files.map(path => {
-      const key = path.split('/').reverse()[0]
-      return this.crypto.decrypt(Buffer.from(key, 'hex')).toString()
+    const all = []
+    files.forEach(path => {
+      const hex = path.split('/').reverse()[0]
+      if (hex[0] === '.') return
+      const key = this.crypto.decrypt(Buffer.from(hex, 'hex')).toString()
+      if (INTERNAL_KEYS.has(key)) return
+      all.push(key)
     })
     if (!prefix) return all
     prefix = b4a.concat([b4a.from(prefix), Namespace.PREFIX_DELIMITER])
